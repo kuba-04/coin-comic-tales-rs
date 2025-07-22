@@ -1,0 +1,74 @@
+name: Run Rust Capstone Project Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Check Rust formatting (cargo fmt)
+        run: |
+          cd rust
+          cargo fmt --check
+
+      - name: Run Rust linter (cargo clippy)
+        run: |
+          cd rust
+          cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Set up Node.js with NVM
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm install --lts
+          node -v
+          npm install
+
+      - name: Make scripts executable
+        run: |
+          chmod +x ./test.sh
+          chmod +x ./run.sh
+          chmod +x ./rust/run-rust.sh
+
+      - name: Run test.sh
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          ./test.sh
+
+      - name: Check result
+        if: ${{ failure() }}
+        run: echo "❌ Some tests failed. Please review the output above."
+
+      - name: Check result on success
+        if: ${{ success() }}
+        run: echo "✅ All tests passed successfully!"
+
+      - name: Upload output file (optional)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: out.txt
+          path: ./out.txt
