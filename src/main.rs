@@ -1,5 +1,4 @@
-use rust::run_rpc_scenario;
-
-fn main() -> bitcoincore_rpc::Result<()> {
-    run_rpc_scenario().map_err(|e| bitcoincore_rpc::Error::ReturnedError(e.to_string()))
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    rust::run_server().await
 }
