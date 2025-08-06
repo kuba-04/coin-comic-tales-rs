@@ -422,7 +422,13 @@ pub async fn run_server() -> std::io::Result<()> {
     println!("Starting server at http://127.0.0.1:8021");
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("http://localhost:8080")
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
+            .max_age(3600);
         App::new()
+            .wrap(cors)
             .app_data(app_state.clone())
             .route("/wallet", web::post().to(create_wallet))
             .route("/address", web::post().to(create_address))
