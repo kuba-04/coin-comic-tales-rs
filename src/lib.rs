@@ -8,9 +8,11 @@ use dotenv as env;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Mutex;
-
+use actix_cors::Cors;
+use actix_web::http::header;
 // const INITIAL_MINING_BLOCKS: u64 = 101;
 // const REQUIRED_MINER_BALANCE: f64 = 20.0;
 // const TRANSFER_AMOUNT: u64 = 20;
@@ -275,6 +277,20 @@ async fn create_address(
     }
 }
 
+async fn get_balance(
+    data: web::Data<AppState>,
+    walletid: web::Path<String>,
+) -> impl Responder {
+    let clients = data.clients.lock().unwrap();
+    println!("Getting balance for: {:?}", &walletid.deref());
+    if let Some(client) = clients.get(walletid.as_str()) {
+        match client.get_wallet_info() {
+            Ok(info) => HttpResponse::Ok().json(info.balance.to_btc()),
+            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        }
+    } else { HttpResponse::NotFound().body("No such wallet") }
+}
+
 async fn mine_blocks(
     data: web::Data<AppState>,
     req: web::Json<MineBlockRequest>,
@@ -433,6 +449,7 @@ pub async fn run_server() -> std::io::Result<()> {
             .route("/wallet", web::post().to(create_wallet))
             .route("/address", web::post().to(create_address))
             .route("/mine", web::post().to(mine_blocks))
+            .route("/wallet/{walletid}/balance", web::get().to(get_balance))
             .route("/send", web::post().to(send_bitcoin))
             .route("/tx/{txid}", web::get().to(get_transaction))
             .route("/mempool/{txid}", web::get().to(get_mempool_entry))

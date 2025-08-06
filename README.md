@@ -72,6 +72,9 @@ curl -X POST http://127.0.0.1:8021/mine \
     \"address\": \"$MINER_ADDRESS\",
     \"blocks\": 101
   }"
+
+# Check the balance
+curl -X GET http://127.0.0.1:8021/wallet/Miner/balance
 ```
 
 ### 3. Get Trading Address and Send Bitcoin
