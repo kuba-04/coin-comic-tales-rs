@@ -400,7 +400,7 @@ async fn get_transaction(data: web::Data<AppState>, txid: web::Path<String>) -> 
 
         match client.get_transaction(&txid, None) {
             Ok(tx) => HttpResponse::Ok().json(GetTransactionResultWrapper(tx)),
-            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+            Err(e) => HttpResponse::NotFound().body(e.to_string()),
         }
     } else {
         HttpResponse::ServiceUnavailable().body("No active clients")
@@ -419,7 +419,7 @@ async fn get_mempool_entry(data: web::Data<AppState>, txid: web::Path<String>) -
 
         match client.get_mempool_entry(&txid) {
             Ok(entry) => HttpResponse::Ok().json(entry),
-            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+            Err(e) => HttpResponse::NotFound().body(e.to_string()),
         }
     } else {
         HttpResponse::ServiceUnavailable().body("No active clients")
