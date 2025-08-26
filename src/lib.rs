@@ -51,6 +51,7 @@ struct Config {
     rpc_url: String,
     rpc_user: String,
     rpc_password: String,
+    server_url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,6 +79,8 @@ impl Config {
             })?,
             rpc_url: env::var("rpc_url")
                 .map_err(|_| RpcError::ReturnedError("cannot load rpc-url from env file".into()))?,
+            server_url: env::var("server_url")
+                .map_err(|_| RpcError::ReturnedError("cannot load server-url from env file".into()))?,
         })
     }
 
@@ -142,7 +145,6 @@ async fn get_balance(
     walletid: web::Path<String>,
 ) -> impl Responder {
     let clients = &data.clients;
-    println!("Getting balance for: {:?}", &walletid.deref());
     if let Some(client) = clients.get(walletid.as_str()) {
         match client.get_wallet_info() {
             Ok(info) => HttpResponse::Ok().json(info.balance.to_sat()),
@@ -290,16 +292,15 @@ pub async fn run_server() -> std::io::Result<()> {
     env_logger::init();
 
     let config = Config::from_env().expect("Failed to load config");
+    let server_url = config.server_url.clone();
     let app_state = web::Data::new(AppState {
         config,
         clients: DashMap::new(),
     });
 
-    println!("Starting server at http://127.0.0.1:8021");
-
     HttpServer::new(move || {
         let cors = Cors::default()
-            .allowed_origin("http://localhost:8080")
+            .allowed_origin(server_url.as_str())
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
             .max_age(3600);
