@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::Mutex;
 use actix_cors::Cors;
 use actix_web::http::header;
+use dashmap::DashMap;
 // const INITIAL_MINING_BLOCKS: u64 = 101;
 // const REQUIRED_MINER_BALANCE: f64 = 20.0;
 // const TRANSFER_AMOUNT: u64 = 20;
@@ -40,14 +40,14 @@ struct MineBlockRequest {
 struct SendBitcoinRequest {
     from_wallet: String,
     to_address: String,
-    amount: f64,
+    amount: u64,
     message: Option<String>,
 }
 
 // AppState to hold shared configuration
 struct AppState {
     config: Config,
-    clients: Mutex<HashMap<String, Client>>,
+    clients: DashMap<String, Client>,
 }
 
 #[derive(Debug)]
@@ -242,7 +242,7 @@ async fn create_wallet(
 
     match get_wallet(&client, &req.name) {
         Ok(result) => {
-            let mut clients = data.clients.lock().unwrap();
+            let clients = &data.clients;
             clients.insert(req.name.clone(), client);
             HttpResponse::Ok().json(result)
         }
@@ -255,7 +255,7 @@ async fn create_address(
     data: web::Data<AppState>,
     req: web::Json<CreateWalletAddress>,
 ) -> impl Responder {
-    let clients = data.clients.lock().unwrap();
+    let clients = &data.clients;
     if let Some(client) = clients.get(&req.wallet_name) {
         let address =
             match client.get_new_address(Some(req.name.as_str()), Some(AddressType::Bech32)) {
@@ -281,11 +281,11 @@ async fn get_balance(
     data: web::Data<AppState>,
     walletid: web::Path<String>,
 ) -> impl Responder {
-    let clients = data.clients.lock().unwrap();
+    let clients = &data.clients;
     println!("Getting balance for: {:?}", &walletid.deref());
     if let Some(client) = clients.get(walletid.as_str()) {
         match client.get_wallet_info() {
-            Ok(info) => HttpResponse::Ok().json(info.balance.to_btc()),
+            Ok(info) => HttpResponse::Ok().json(info.balance.to_sat()),
             Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
         }
     } else { HttpResponse::NotFound().body("No such wallet") }
@@ -295,7 +295,7 @@ async fn mine_blocks(
     data: web::Data<AppState>,
     req: web::Json<MineBlockRequest>,
 ) -> impl Responder {
-    let clients = data.clients.lock().unwrap();
+    let clients = &data.clients;
     if let Some(client) = clients.get(&req.wallet_name) {
         let address = match Address::from_str(&req.address) {
             Ok(addr) => match addr.require_network(Network::Regtest) {
@@ -320,7 +320,7 @@ async fn send_bitcoin(
     data: web::Data<AppState>,
     req: web::Json<SendBitcoinRequest>,
 ) -> impl Responder {
-    let clients = data.clients.lock().unwrap();
+    let clients = &data.clients;
     if let Some(client) = clients.get(&req.from_wallet) {
         let to_address = match Address::from_str(&req.to_address) {
             Ok(addr) => match addr.require_network(Regtest) {
@@ -332,7 +332,7 @@ async fn send_bitcoin(
             Err(e) => return HttpResponse::BadRequest().body(format!("Invalid address: {}", e)),
         };
 
-        let amount = Amount::from_btc(req.amount).unwrap();
+        let amount = Amount::from_sat(req.amount);
         match client.send_to_address(
             &to_address,
             amount,
@@ -388,9 +388,9 @@ impl Serialize for GetTransactionResultWrapper {
     }
 }
 
-async fn get_transaction(data: web::Data<AppState>, txid: web::Path<String>) -> impl Responder {
-    let clients = data.clients.lock().unwrap();
-    if let Some(client) = clients.values().next() {
+async fn get_transaction(data: web::Data<AppState>, path: web::Path<(String, String)>) -> impl Responder {
+    let (walletid, txid) = path.into_inner();
+    if let Some(client) = data.clients.get(walletid.as_str()) {
         let txid = match Txid::from_str(&txid) {
             Ok(id) => id,
             Err(e) => {
@@ -407,9 +407,9 @@ async fn get_transaction(data: web::Data<AppState>, txid: web::Path<String>) -> 
     }
 }
 
-async fn get_mempool_entry(data: web::Data<AppState>, txid: web::Path<String>) -> impl Responder {
-    let clients = data.clients.lock().unwrap();
-    if let Some(client) = clients.values().next() {
+async fn get_mempool_entry(data: web::Data<AppState>, path: web::Path<(String, String)>) -> impl Responder {
+    let (walletid, txid) = path.into_inner();
+    if let Some(client) = data.clients.get(walletid.as_str()) {
         let txid = match Txid::from_str(&txid) {
             Ok(id) => id,
             Err(e) => {
@@ -432,7 +432,7 @@ pub async fn run_server() -> std::io::Result<()> {
     let config = Config::from_env().expect("Failed to load config");
     let app_state = web::Data::new(AppState {
         config,
-        clients: Mutex::new(HashMap::new()),
+        clients: DashMap::new(),
     });
 
     println!("Starting server at http://127.0.0.1:8021");
@@ -451,8 +451,8 @@ pub async fn run_server() -> std::io::Result<()> {
             .route("/mine", web::post().to(mine_blocks))
             .route("/wallet/{walletid}/balance", web::get().to(get_balance))
             .route("/send", web::post().to(send_bitcoin))
-            .route("/tx/{txid}", web::get().to(get_transaction))
-            .route("/mempool/{txid}", web::get().to(get_mempool_entry))
+            .route("/tx/{walletid}/{txid}", web::get().to(get_transaction))
+            .route("/mempool/{walletid}/{txid}", web::get().to(get_mempool_entry))
     })
     .bind("127.0.0.1:8021")?
     .run()
