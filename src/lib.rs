@@ -7,15 +7,11 @@ use bitcoincore_rpc::{Auth, Client, Error as RpcError, RpcApi};
 use dotenv as env;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
 use actix_cors::Cors;
 use actix_web::http::header;
 use dashmap::DashMap;
-// const INITIAL_MINING_BLOCKS: u64 = 101;
-// const REQUIRED_MINER_BALANCE: f64 = 20.0;
-// const TRANSFER_AMOUNT: u64 = 20;
 
 // Request/Response structs for API
 #[derive(Deserialize)]
@@ -208,7 +204,7 @@ async fn send_bitcoin(
             None,
         ) {
             Ok(txid) => HttpResponse::Ok().json(txid.to_string()),
-            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+            Err(e) => HttpResponse::BadRequest().body(e.to_string()),
         }
     } else {
         HttpResponse::NotFound().body("Wallet not found")
