@@ -50,7 +50,7 @@ jobs:
       # Verify container starts properly
       - name: Verify container starts
         run: |
-          docker run --name test-container -d test-image
+          docker run --name test-container -d -e user=alice -e password=password -e rpc_url=http://localhost:18443 -e server_url=http://localhost:8021 test-image
           # Wait for container to initialize
           sleep 10
           # Check if container is running
