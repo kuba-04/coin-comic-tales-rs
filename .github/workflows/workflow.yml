@@ -1,0 +1,83 @@
+name: Build and Push Docker Image (Rust)
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Rust toolchain
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      # Verify project builds correctly
+      - name: Verify project build
+        run: |
+          # Check if Cargo.lock exists and use appropriate command
+          if [ -f "Cargo.lock" ]; then
+            echo "Using cargo build with existing Cargo.lock"
+            cargo build --release
+          else
+            echo "No Cargo.lock found, generating it during build"
+            cargo build --release
+          fi
+          
+          # Verify the binary was created
+          if [ ! -f "target/release/$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].name')" ]; then
+            echo "Build failed: release binary not found"
+            exit 1
+          fi
+          echo "Rust project built successfully"
+
+      # Run tests
+      - name: Run tests
+        run: cargo test --release
+
+      # Test Docker image build
+      - name: Test Docker image build
+        run: docker build -t test-image .
+
+      # Verify container starts properly
+      - name: Verify container starts
+        run: |
+          docker run --name test-container -d test-image
+          # Wait for container to initialize
+          sleep 10
+          # Check if container is running
+          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' test-container)
+          if [ "$CONTAINER_STATUS" != "running" ]; then
+            echo "Container failed to start properly"
+            docker logs test-container
+            exit 1
+          fi
+          echo "Container started successfully"
+          # Clean up
+          docker stop test-container
+          docker rm test-container
+
+      # The following steps only run on push to master, not on pull requests
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+      - name: Build Docker image for registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          docker build -t ghcr.io/${{ secrets.GHCR_USERNAME }}/coin-comic-tales-rs:${{ github.sha }} .
+          docker tag ghcr.io/${{ secrets.GHCR_USERNAME }}/coin-comic-tales-rs:${{ github.sha }} ghcr.io/${{ secrets.GHCR_USERNAME }}/coin-comic-tales-rs:latest
+
+      - name: Push Docker image to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/coin-comic-tales-rs:${{ github.sha }}
+          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/coin-comic-tales-rs:latest
