@@ -19,3 +19,18 @@ services:
         txindex=1
     ports:
       - "18443:18443"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - RUST_LOG=info
+      - user=alice
+      - password=password
+      - rpc_url=http://bitcoin:18443
+      - server_url=http://localhost:8021
+    ports:
+      - "8021:8021"
+    depends_on:
+      - bitcoin

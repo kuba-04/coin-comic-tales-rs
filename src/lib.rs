@@ -7,7 +7,6 @@ use bitcoincore_rpc::{Auth, Client, Error as RpcError, RpcApi};
 use dotenv as env;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
-use std::ops::Deref;
 use std::str::FromStr;
 use actix_cors::Cors;
 use actix_web::http::header;

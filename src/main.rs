@@ -1,4 +1,4 @@
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    rust::run_server().await
+    coin_comic_tales_rs::run_server().await
 }

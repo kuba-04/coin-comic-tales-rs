@@ -13,6 +13,9 @@ rpcuser=alice
 rpcpassword=password
 ```
 
+you can use ./docker-compose.yaml or download image `btcpayserver/bitcoin:29.0` and run the container manually
+`docker pull btcpayserver/bitcoin:29.0`
+
 2. Create a `.env` file in the project root with:
 
 ```
@@ -22,6 +25,21 @@ rpc_url=http://localhost:18443
 ```
 
 ## Running the Server
+
+### Using Docker
+
+1. build:
+`docker build -t coin-comic-tales-rs .`
+
+2. run:
+`docker run -p 8021:8021 \
+    -e user=alice \
+    -e password=password \
+    -e rpc_url=http://localhost:18443 \
+    -e server_url=http://localhost:8021 \
+    coin-comic-tales-rs`
+
+### Using Rust
 
 1. Start Bitcoin Core in regtest mode
 2. Start the API server:
