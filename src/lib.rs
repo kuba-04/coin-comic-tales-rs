@@ -384,7 +384,7 @@ pub async fn run_server() -> std::io::Result<()> {
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin(server_url.as_str())
-            .allowed_methods(vec!["GET", "POST"])
+            .allowed_methods(vec!["GET", "POST", "OPTIONS"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
             .max_age(3600);
         App::new()
