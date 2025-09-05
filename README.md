@@ -37,7 +37,12 @@ rpc_url=http://localhost:18443
     -e password=password \
     -e rpc_url=http://localhost:18443 \
     -e server_url=http://localhost:8021 \
+    -e RUST_LOG=info \
     coin-comic-tales-rs`
+
+Notes:
+- The server binds to 0.0.0.0:8021 inside the container so port publishing works.
+- Logging defaults to info if RUST_LOG is not provided; you can override, e.g. `-e RUST_LOG=debug,actix_web=info`. 
 
 ### Using Rust
 
@@ -171,3 +176,30 @@ The output file `out.txt` will be created with the transaction details in the fo
 <block_height>
 <confirmation_block_hash>
 ```
+
+## Logging
+
+This app uses env_logger and actix-web's Logger middleware to emit structured logs. You can control verbosity using the RUST_LOG environment variable.
+
+Examples:
+
+- Enable info-level logs (recommended):
+  RUST_LOG=info cargo run
+
+- Enable detailed debug logs for this app and Actix:
+  RUST_LOG=debug,actix_web=info cargo run
+
+When running in Docker, pass RUST_LOG as an environment variable:
+  docker run -p 8021:8021 \
+    -e user=alice \
+    -e password=password \
+    -e rpc_url=http://localhost:18443 \
+    -e server_url=http://localhost:8021 \
+    -e RUST_LOG=info \
+    coin-comic-tales-rs
+
+What you will see in logs:
+- Server startup configuration and bind address
+- Per-request access logs (method, path, status, latency)
+- High-level actions (wallet create/load, address generation, mining, send)
+- Bitcoin RPC interactions outcomes (success/failures) without logging sensitive data
